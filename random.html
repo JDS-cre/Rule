@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>운명의 돌림판 제비뽑기</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #1e1b4b, #312e81);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            -webkit-tap-highlight-color: transparent;
+            color: white;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 25px 20px;
+            border-radius: 24px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+            text-align: center;
+            width: 90%;
+            max-width: 360px;
+            position: relative;
+        }
+        h2 { margin-top: 0; margin-bottom: 5px; font-size: 20px; }
+        .names {
+            font-size: 12px;
+            color: #cbd5e1;
+            margin-bottom: 15px;
+        }
+        
+        /* 룰렛 디자인 */
+        .roulette-container {
+            position: relative;
+            width: 250px;
+            height: 250px;
+            margin: 0 auto 20px auto;
+        }
+        .pointer {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 20px solid #ef4444;
+            z-index: 10;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+        }
+        .wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 4px solid #ffffff;
+            position: relative;
+            overflow: hidden;
+            transition: transform 3.5s cubic-bezier(0.15, 0.85, 0.15, 1);
+            box-shadow: 0 0 20px rgba(0,0,0,0.4);
+            background: #334155;
+        }
+        
+        /* 부채꼴 조각 */
+        .slice {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            clip-path: polygon(50% 50%, 100% 0%, 100% 0%); /* 초기 뼈대 */
+        }
+
+        /* 캔버스 대신 SVG나 깔끔한 회전 구조를 위한 레이블 스타일 */
+        .wheel-label {
+            position: absolute;
+            width: 50%;
+            height: 50%;
+            top: 0;
+            left: 50%;
+            transform-origin: 0% 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .wheel-label span {
+            position: absolute;
+            font-size: 13px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            transform: rotate(30deg); /* 각 조각 중심에 오도록 회전 */
+            left: 15px;
+            top: 45px;
+        }
+        
+        button.draw-btn {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 17px;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            width: 100%;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+        button.draw-btn:active { transform: scale(0.97); }
+        button.draw-btn:disabled { background: #475569; opacity: 0.7; cursor: not-allowed; }
+        
+        #result {
+            margin-top: 15px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #f8fafc;
+            min-height: 30px;
+        }
+
+        /* 비밀 조작 패널 */
+        #secret-panel {
+            display: none;
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(254, 243, 199, 0.95);
+            color: #1e293b;
+            border: 1px dashed #f59e0b;
+            border-radius: 10px;
+            text-align: left;
+            font-size: 12px;
+        }
+        #secret-panel select {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+            font-size: 13px;
+            background: white;
+        }
+        
+        .secret-trigger {
+            position: absolute;
+            bottom: 5px;
+            right: 10px;
+            font-size: 10px;
+            color: rgba(255,255,255,0.2);
+            padding: 10px;
+            cursor: pointer;
+            user-select: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>🎡 운명의 돌림판</h2>
+    <div class="names">참여자: 김철수, 이영희, 박민수, 정수진, 홍길동, 김미영</div>
+    
+    <!-- 돌림판 구조 -->
+    <div class="roulette-container">
+        <div class="pointer"></div>
+        <div class="wheel" id="wheel"></div>
+    </div>
+
+    <button class="draw-btn" id="drawBtn" onclick="startDraw()">돌림판 돌리기!</button>
+    
+    <div id="result"></div>
+
+    <!-- 비밀 조작 패널 -->
+    <div id="secret-panel">
+        <strong>⚙️ [관리자 설정]</strong><br>
+        <label for="rigged-target">다음 당첨자 강제 지정:</label>
+        <select id="rigged-target">
+            <option value="">랜덤 (완벽 공정 모드)</option>
+            <option value="최홍혁">최홍혁</option>
+            <option value="전다산">전다산</option>
+            <option value="김승준">김승준</option>
+            <option value="김영훈">김영훈</option>
+            <option value="김성훈">김성훈</option>
+            <option value="홍승표">홍승표</option>
+        </select>
+    </div>
+
+    <!-- 구석의 투명한 비밀 버튼 -->
+    <div class="secret-trigger" onclick="handleSecretClick()">•</div>
+</div>
+
+<script>
+    const participants = ["최홍혁", "전다산", "김승준", "김영훈", "김성훈", "홍승표"];
+    // 6등분에 딱 어울리는 감각적인 색상 팔레트
+    const colors = ["#ef4444", "#f97316", "#eab308", "#10b981", "#3b82f6", "#8b5cf6"];
+    
+    let currentRotation = 0;
+    let clickCount = 0;
+    let clickTimer = null;
+
+    const wheel = document.getElementById('wheel');
+    const sliceAngle = 360 / participants.length; // 60도씩
+
+    // 완벽하게 정렬되는 룰렛 세그먼트 생성
+    participants.forEach((name, index) => {
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'wheel-label';
+        
+        // 각 부채꼴 영역별로 회전 배치
+        const rotationAngle = index * sliceAngle;
+        labelDiv.style.transform = `rotate(${rotationAngle}deg)`;
+        
+        // 부채꼴 색상 배경을 위한 conic-gradient 대신 DOM 요소로 깔끔하게 조각 분할 표현
+        const sliceBg = document.createElement('div');
+        sliceBg.style.position = 'absolute';
+        sliceBg.style.width = '100%';
+        sliceBg.style.height = '100%';
+        sliceBg.style.clipPath = `polygon(50% 50%, ${50 + 50 * Math.cos((index * sliceAngle - 90) * Math.PI / 180)}% ${50 + 50 * Math.sin((index * sliceAngle - 90) * Math.PI / 180)}%, ${50 + 50 * Math.cos(((index + 1) * sliceAngle - 90) * Math.PI / 180)}% ${50 + 50 * Math.sin(((index + 1) * sliceAngle - 90) * Math.PI / 180)}%)`;
+        sliceBg.style.backgroundColor = colors[index];
+        wheel.appendChild(sliceBg);
+
+        // 이름 텍스트
+        const span = document.createElement('span');
+        span.innerText = name;
+        // 각 조각의 정중앙에 위치하도록 각도 보정
+        span.style.transform = `rotate(${sliceAngle / 2}deg)`;
+        labelDiv.appendChild(span);
+        
+        wheel.appendChild(labelDiv);
+    });
+
+    function handleSecretClick() {
+        clickCount++;
+        clearTimeout(clickTimer);
+        
+        if (clickCount >= 3) {
+            const panel = document.getElementById('secret-panel');
+            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+            clickCount = 0;
+        } else {
+            clickTimer = setTimeout(() => { clickCount = 0; }, 500);
+        }
+    }
+
+    function startDraw() {
+        const resultDiv = document.getElementById('result');
+        const drawBtn = document.getElementById('drawBtn');
+        const targetSelect = document.getElementById('rigged-target');
+        const riggedTarget = targetSelect.value;
+        
+        drawBtn.disabled = true;
+        resultDiv.innerText = "";
+
+        let winningIndex = -1;
+
+        if (riggedTarget !== "") {
+            winningIndex = participants.indexOf(riggedTarget);
+            targetSelect.value = "";
+            document.getElementById('secret-panel').style.display = 'none';
+        } else {
+            winningIndex = Math.floor(Math.random() * participants.length);
+        }
+
+        const winner = participants[winningIndex];
+
+        // 화살표(상단 12시 방향)가 해당 조각의 정확히 한가운데 오도록 계산
+        // 각 칸의 중심은 index * sliceAngle + (sliceAngle / 2) 지점임
+        const centerOffset = (winningIndex * sliceAngle) + (sliceAngle / 2);
+        const extraTurns = 360 * 5; // 5바퀴 회전
+        
+        // 360도 기준으로 해당 칸의 중심이 상단(0도)에 오도록 맞추는 목표 각도 계산
+        const targetAngle = 360 - centerOffset;
+        const totalRotation = currentRotation + extraTurns + (targetAngle - (currentRotation % 360) + 360) % 360;
+        
+        currentRotation = totalRotation;
+        wheel.style.transform = `rotate(${currentRotation}deg)`;
+
+        setTimeout(() => {
+            resultDiv.innerText = `🎉 당첨: ${winner}! 🎉`;
+            drawBtn.disabled = false;
+        }, 3500);
+    }
+</script>
+
+</body>
+</html>
